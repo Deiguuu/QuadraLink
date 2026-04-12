@@ -8,22 +8,43 @@ class SocketHandler:
         self.mqtt_client = mqtt_client
         self.register_events()
 
+    # =========================
+    # VALIDACIÓN PRO
+    # =========================
     def validate_command(self, data):
-        required_fields = ["accion", "motor"]
 
-        for field in required_fields:
-            if field not in data:
-                return False, f"Falta el campo: {field}"
+        if "accion" not in data:
+            return False, "Falta accion"
 
-        if data["accion"] == "mover":
-            if "angulo" not in data:
-                return False, "Falta 'angulo' para accion mover"
+        if data["accion"] == "mover_todo":
 
-            if not isinstance(data["angulo"], (int, float)):
-                return False, "Angulo debe ser numérico"
+            required = ["base", "hombro", "codo", "pinza"]
+
+            for r in required:
+                if r not in data:
+                    return False, f"Falta {r}"
+
+                if not isinstance(data[r], (int, float)):
+                    return False, f"{r} debe ser numérico"
+
+            # Validar rangos
+            for r in required:
+                if not (0 <= data[r] <= 180):
+                    return False, f"{r} fuera de rango (0-180)"
+
+        elif data["accion"] == "mover":
+
+            if "motor" not in data or "angulo" not in data:
+                return False, "Faltan campos"
+
+        else:
+            return False, "Acción no válida"
 
         return True, "OK"
 
+    # =========================
+    # EVENTOS
+    # =========================
     def register_events(self):
 
         @self.socketio.on("connect")
@@ -31,34 +52,25 @@ class SocketHandler:
             print("[Socket] Cliente conectado")
             emit("respuesta", {"status": "conectado"})
 
-        @self.socketio.on("disconnect")
-        def handle_disconnect():
-            print("[Socket] Cliente desconectado")
-
         @self.socketio.on("enviar_comando")
         def handle_command(data):
-            print(f"[Socket] Comando recibido: {data}")
 
-            valid, message = self.validate_command(data)
+            print("[Socket] Recibido:", data)
+
+            valid, msg = self.validate_command(data)
 
             if not valid:
-                emit("error", {"error": message})
+                emit("error", {"error": msg})
                 return
 
             try:
-                # Transformación si es necesaria (puedes adaptar al ESP32)
-                comando_mqtt = {
-                    "accion": data["accion"],
-                    "motor": data["motor"],
-                    "angulo": data.get("angulo", None)
-                }
-
+                # 🔥 Enviar directo a MQTT
                 self.mqtt_client.publish(
                     Config.MQTT_TOPIC_COMMANDS,
-                    comando_mqtt
+                    data
                 )
 
-                emit("respuesta", {"status": "comando_enviado"})
+                emit("respuesta", {"status": "enviado"})
 
             except Exception as e:
                 emit("error", {"error": str(e)})
