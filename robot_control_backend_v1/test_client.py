@@ -6,11 +6,13 @@ sio = socketio.Client()
 def connect():
     print("✅ Conectado al servidor")
 
-    # Enviar comando de prueba
     comando = {
-        "accion": "mover",
-        "motor": "base",
-        "angulo": 90
+        "accion": "mover_todo",
+        "base": 90,
+        "hombro": 120,
+        "codo": 80,
+        "pinza": 40,
+        "velocidad": 5
     }
 
     print("📤 Enviando comando:", comando)
@@ -18,7 +20,7 @@ def connect():
 
 @sio.on("respuesta")
 def respuesta(data):
-    print("📩 Respuesta del servidor:", data)
+    print("📩 Respuesta:", data)
 
 @sio.on("estado_robot")
 def estado(data):
@@ -28,12 +30,5 @@ def estado(data):
 def error(data):
     print("❌ Error:", data)
 
-@sio.event
-def disconnect():
-    print("🔌 Desconectado")
-
-# Conectarse al servidor
 sio.connect("http://localhost:5000")
-
-# Mantener el cliente activo
 sio.wait()
